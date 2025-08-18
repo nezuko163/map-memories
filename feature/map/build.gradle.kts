@@ -72,8 +72,6 @@ dependencies {
     implementation(libs.maps.mobile)
     implementation(libs.play.services.location)
 
-
-
     // navigation
     implementation(libs.androidx.navigation.compose)
 

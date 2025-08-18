@@ -1,141 +1,184 @@
 package com.nezuko.ui.components
 
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
+import android.util.Log
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.spring
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.MutableFloatState
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.lerp
+import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Velocity
+import com.nezuko.ui.utils.lerpFloat
+import kotlin.math.abs
+import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
-@Composable
-fun CollapsingTopBarByFraction(
-    collapseFraction: Float, // 0..1 (0 = expanded, 1 = collapsed)
-    expandedHeight: Dp = 160.dp,
-    collapsedHeight: Dp = 56.dp,
-    backgroundColor: Color = MaterialTheme.colorScheme.primaryContainer,
-    expandedContent: @Composable (progress: Float) -> Unit,
-    collapsedContent: @Composable (progress: Float) -> Unit
-) {
-    // анимируем параметры визуально (плавно)
-    val height by animateDpAsState(targetValue = lerp(expandedHeight, collapsedHeight, collapseFraction))
-    val expandedAlpha by animateFloatAsState(targetValue = (1f - collapseFraction).coerceIn(0f, 1f))
-    val collapsedAlpha by animateFloatAsState(targetValue = collapseFraction.coerceIn(0f, 1f))
+private const val TAG = "CollapsingTopBar"
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(height)
-            .background(backgroundColor),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .alpha(expandedAlpha),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            expandedContent(collapseFraction)
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 12.dp)
-                .alpha(collapsedAlpha),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            collapsedContent(collapseFraction)
-        }
-    }
-}
-
+@Stable
 class CollapsingTopBarState internal constructor(
-    internal val maxCollapsePx: Float,
-    internal val offsetPxState: MutableState<Float>,
-    val connection: NestedScrollConnection
+    internal val maxCollapsePxState: MutableFloatState,
+    internal val offsetPxState: MutableFloatState,
+    val connection: NestedScrollConnection,
 ) {
-    val offsetPx: Float get() = offsetPxState.value
-    val collapseFraction: Float get() = if (maxCollapsePx <= 0f) 1f else (offsetPxState.value / maxCollapsePx).coerceIn(0f, 1f)
+    var maxCollapsePx: Float
+        get() = maxCollapsePxState.floatValue
+        set(v) {
+            maxCollapsePxState.floatValue = v
+        }
 
-    fun snapToCollapsed() { offsetPxState.value = maxCollapsePx }
-    fun snapToExpanded() { offsetPxState.value = 0f }
+    var offsetPx: Float
+        get() = offsetPxState.floatValue
+        set(v) {
+            offsetPxState.floatValue = v
+        }
+
+    val collapseFraction: Float
+        get() = if (maxCollapsePx <= 0f) 1f else (offsetPx / maxCollapsePx).coerceIn(0f, 1f)
+
 }
 
 @Composable
-fun rememberCollapsingTopBarState(
-    expandedHeight: Dp,
-    collapsedHeight: Dp
-): CollapsingTopBarState {
-    val density = LocalDensity.current
-    val maxCollapsePx = with(density) { (expandedHeight - collapsedHeight).coerceAtLeast(0.dp).toPx() }
+fun rememberCollapsingTopBarState(): CollapsingTopBarState {
+    val maxCollapsePxState = rememberSaveable { mutableFloatStateOf(0f) }
+    val offsetPxState = rememberSaveable { mutableFloatStateOf(0f) }
+    var offsetAnim = remember { Animatable(offsetPxState.floatValue) }
 
-    val offsetPxState = remember { mutableStateOf(0f) } // 0..maxCollapsePx
-
-    // nested scroll connection: consumes scroll to update offset (collapse/expand)
-    val connection = remember(maxCollapsePx) {
+    val connection = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // available.y > 0 : scrolling down (pulling content down) -> expand (reduce offset)
-                // available.y < 0 : scrolling up -> collapse (increase offset)
                 val dy = available.y
+                val maxCollapse = maxCollapsePxState.floatValue
+                val currentOffset = offsetPxState.floatValue
+
                 if (dy < 0f) {
-                    // collapse - increase offset
-                    val toConsume = min(-dy, maxCollapsePx - offsetPxState.value)
+                    // collapse (scroll up) — increase offset, consume what we can
+                    val toConsume = min(-dy, max(0f, maxCollapse - currentOffset))
                     if (toConsume > 0f) {
-                        offsetPxState.value += toConsume
+                        offsetPxState.floatValue = currentOffset + toConsume
+                        // no snapTo here — keep Animatable untouched during gesture
                         return Offset(0f, -toConsume)
                     }
                 } else if (dy > 0f) {
-                    // expand - decrease offset
-                    val toConsume = min(dy, offsetPxState.value)
+                    // expand (scroll down) — reduce offset
+                    val toConsume = min(dy, currentOffset)
                     if (toConsume > 0f) {
-                        offsetPxState.value -= toConsume
+                        offsetPxState.floatValue = currentOffset - toConsume
+                        // no snapTo here
                         return Offset(0f, toConsume)
                     }
                 }
                 return Offset.Zero
             }
 
-            // optionally handle fling so toolbar snaps; simple version: consume fling if offset present
-            override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
-                // if fling upward (available.y < 0) and not fully collapsed -> finish collapse
-                // if fling downward (available.y > 0) and not fully expanded -> finish expand
-                val vy = available.y
-                if (vy < 0f && offsetPxState.value < maxCollapsePx / 2f) {
-                    // user flung up: snap to collapsed
-                    offsetPxState.value = maxCollapsePx
-                } else if (vy > 0f && offsetPxState.value > maxCollapsePx / 2f) {
-                    // user flung down: snap to expanded
-                    offsetPxState.value = 0f
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                val dy = available.y
+                val maxCollapse = maxCollapsePxState.floatValue
+                val current = offsetPxState.floatValue
+
+                if (dy < 0f) {
+                    val toConsume = min(-dy, max(0f, maxCollapse - current))
+                    if (toConsume > 0f) {
+                        offsetPxState.floatValue = current + toConsume
+                        return Offset(0f, -toConsume)
+                    }
+                } else if (dy > 0f) {
+                    val toConsume = min(dy, current)
+                    if (toConsume > 0f) {
+                        offsetPxState.floatValue = current - toConsume
+                        return Offset(0f, toConsume)
+                    }
                 }
-                // do not consume the fling motion (return Velocity.Zero) so list still scrolls
-                return androidx.compose.ui.unit.Velocity.Zero
+                return Offset.Zero
             }
+
+//            override suspend fun onPreFling(available: Velocity): Velocity {
+//                val cur = offsetPxState.floatValue
+//                val max = maxCollapsePxState.floatValue
+//                if (max <= 0f) return Velocity.Zero
+//
+//                val target = if (cur > max / 2f) max else 0f
+//                // синхронизируем animatable с текущим значением и анимируем
+//                offsetAnim.snapTo(cur)
+//                offsetAnim.animateTo(target, animationSpec = spring())
+//                offsetPxState.floatValue = offsetAnim.value
+//                // мы обработали fling — возвращаем входящую скорость (т.е. потребили её)
+//                return available
+//            }
         }
     }
 
-    return remember(maxCollapsePx, offsetPxState, connection) {
-        CollapsingTopBarState(maxCollapsePx, offsetPxState, connection)
+    return remember {
+        CollapsingTopBarState(
+            maxCollapsePxState,
+            offsetPxState,
+            connection
+        )
+    }
+}
+
+@Composable
+fun CollapsingTopBar(
+    modifier: Modifier = Modifier,
+    state: CollapsingTopBarState = rememberCollapsingTopBarState(),
+    content: @Composable () -> Unit
+) {
+    SubcomposeLayout(modifier) { constraints ->
+        val looseConstraints = constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity)
+
+        val expandedMeasurables = subcompose("expanded") {
+            content() // полностью раскрытое состояние
+        }
+        val expandedPlaceable = expandedMeasurables
+            .map { it.measure(looseConstraints) }
+            .firstOrNull()
+
+        val collapsedH = 0
+        val expandedH = (expandedPlaceable?.height ?: collapsedH)
+            .coerceIn(collapsedH, constraints.maxHeight)
+        Log.i(TAG, "CollapsingTopBar: expH - $expandedH")
+
+        val newMaxCollapse = (expandedH - collapsedH).toFloat().coerceAtLeast(0f)
+        if (abs(state.maxCollapsePx - newMaxCollapse) > 0.5f) {
+            // internal поле maxCollapsePxState есть в твоём state — обновляем
+            state.maxCollapsePx = newMaxCollapse
+        }
+
+        Log.i(TAG, "CollapsingTopBar: newMaxColl - $newMaxCollapse")
+
+        state.offsetPx = state.offsetPx.coerceIn(0f, state.maxCollapsePx)
+
+        val contentMeasurables = subcompose("content_draw") {
+            content()
+        }
+
+        val height = lerpFloat(expandedH.toFloat(), collapsedH.toFloat(), state.collapseFraction)
+            .roundToInt()
+            .coerceIn(0, expandedH)
+
+        val contentConstraints = constraints.copy(
+            minHeight = height,
+            maxHeight = height
+        )
+
+        val contentPlaceable = contentMeasurables
+            .map { it.measure(contentConstraints) }
+            .firstOrNull()
+
+        Log.i(TAG, "CollapsingTopBar: height - $height")
+
+        layout(contentConstraints.maxWidth, height) {
+            contentPlaceable?.place(0, 0)
+        }
     }
 }

@@ -13,17 +13,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.paging.compose.collectAsLazyPagingItems
-import com.nezuko.ui.components.CollapsingTopBarByFraction
+import com.nezuko.ui.components.CollapsingTopBarWithExpandedContent
 import com.nezuko.ui.components.LayoutType
 import com.nezuko.ui.components.MemoryCard
 import com.nezuko.ui.components.PagingList
 import com.nezuko.ui.components.SearchTextField
 import com.nezuko.ui.components.UnderlinedTextWithGap
 import com.nezuko.ui.components.rememberCollapsingTopBarState
+import com.nezuko.ui.components.rememberCollapsingTopBarWithExpandedContentState
 import com.nezuko.ui.theme.Spacing
 
 private const val TAG = "MainRoute"
@@ -41,21 +41,11 @@ fun MainRoute(
     LaunchedEffect(Unit) {
         query = vm.getQuery()
     }
-
-    val expandedHeight = remember { 160.dp }
-    val collapsedHeight = remember { 56.dp }
-
-    val topBarState = rememberCollapsingTopBarState(
-        expandedHeight = expandedHeight,
-        collapsedHeight = collapsedHeight
-    )
-
+    val topBarState = rememberCollapsingTopBarState()
 
     Column(modifier = Modifier.padding(horizontal = Spacing.medium)) {
-        CollapsingTopBarByFraction(
-            collapseFraction = topBarState.collapseFraction,
-            expandedHeight = expandedHeight,
-            collapsedHeight = collapsedHeight,
+        CollapsingTopBarWithExpandedContent(
+            state = topBarState,
             expandedContent = {
                 Column {
                     SearchTextField(
@@ -76,13 +66,13 @@ fun MainRoute(
                 Column {
                     UnderlinedTextWithGap(
                         "Для тебя",
+                        modifier = Modifier.padding(vertical = Spacing.small, horizontal = Spacing.medium),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
         )
-
 
         PagingList(
             items = items,

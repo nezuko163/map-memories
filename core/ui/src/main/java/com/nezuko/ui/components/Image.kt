@@ -73,7 +73,6 @@ fun ImageWithRatio(
         contentDescription = contentDescription,
         contentScale = contentScale,
         modifier = modifier
-            .fillMaxWidth()
             .aspectRatio(ratio)
     ) {
         val state = painter.state

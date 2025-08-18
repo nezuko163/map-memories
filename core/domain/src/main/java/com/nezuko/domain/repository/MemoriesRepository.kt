@@ -7,5 +7,14 @@ import java.util.UUID
 
 interface MemoriesRepository {
     suspend fun getNearestMemories(location: Location): Collection<Memory>
+    suspend fun getMemoriesByBounds(
+        topLeft: Location,
+        topRight: Location,
+        bottomLeft: Location,
+        bottomRight: Location,
+    ): List<Memory>
+
     suspend fun getMemoriesFYP(uid: UUID, page: Int): Paginated<Memory>
+    suspend fun loadMemories(memoriesIds: List<Int>)
+    suspend fun getMemoryById(memoryId: Int): Memory
 }

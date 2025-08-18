@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -8,7 +9,6 @@ plugins {
 
     alias(libs.plugins.android.hilt)
     alias(libs.plugins.ksp)
-
 }
 
 android {
@@ -21,6 +21,13 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+
+        val key = "\"${getLocalProperty("MAP_API_KEY")}\""
+        buildConfigField("String", "MAP_API_KEY", key)
+
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -45,6 +52,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -55,7 +63,6 @@ dependencies {
     implementation(project(":feature:map"))
     implementation(project(":feature:search"))
     implementation(project(":feature:memoryDetails"))
-
 
     debugImplementation(libs.androidx.ui.tooling)
 
@@ -69,9 +76,22 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.material3)
 
-
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.navigation.compose)
 
     implementation(libs.kotlinx.serialization.json)
+
+    // map
+    implementation(libs.maps.mobile)
+    implementation(libs.play.services.location)
+}
+
+fun getLocalProperty(name: String): String {
+    val properties = Properties()
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use { properties.load(it) }
+    }
+    return properties.getProperty(name)
+        ?: error("Property '$name' not found in local.properties")
 }

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun UnderlinedTextWithGap(
     text: String,
+    modifier: Modifier = Modifier,
     gap: Dp = 6.dp,
     lineThickness: Dp = 1.dp,
     color: Color = MaterialTheme.colorScheme.onSurface,
@@ -36,7 +37,7 @@ fun UnderlinedTextWithGap(
     var textWidthPx by remember { mutableIntStateOf(0) }
 
     Column(
-        modifier = Modifier.wrapContentWidth(),
+        modifier = modifier.wrapContentWidth(),
         verticalArrangement = Arrangement.Center
     ) {
         Text(

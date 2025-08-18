@@ -77,7 +77,7 @@ fun <T : EntityWithId> PagingList(
 
     val stateRefresh = items.loadState.refresh
 
-    val maxOffset = 80.dp
+    val maxOffset = 100.dp
     val offsetPx = with(LocalDensity.current) {
         (maxOffset * state.distanceFraction).roundToPx()
     }
