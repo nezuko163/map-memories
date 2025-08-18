@@ -1,108 +1,23 @@
 package com.nezuko.ui.components
 
-import androidx.compose.animation.core.Animatable
+import android.R.attr.translationY
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.Stable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Constraints
 import com.nezuko.ui.utils.lerpFloat
-import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.roundToInt
 
-/**
- * State holder for collapsing top bar.
- */
-@Stable
-class CollapsingTopBarWithExpandedContentState internal constructor(
-    internal val maxCollapsePxState: MutableState<Float>,
-    internal val offsetPxState: MutableState<Float>,
-    internal val connection: NestedScrollConnection,
-) {
-    var maxCollapsePx: Float
-        get() = maxCollapsePxState.value
-        set(v) { maxCollapsePxState.value = v }
 
-    var offsetPx: Float
-        get() = offsetPxState.value
-        set(v) { offsetPxState.value = v }
-
-    val collapseFraction: Float
-        get() = if (maxCollapsePx <= 0f) 1f else (offsetPx / maxCollapsePx).coerceIn(0f, 1f)
-
-    // expose nested scroll connection for convenience
-    val nestedScrollConnection: NestedScrollConnection get() = connection
-}
-
-/**
- * remember helper — returns state with nested scroll connection and animatable backing.
- */
-@Composable
-fun rememberCollapsingTopBarWithExpandedContentState(): CollapsingTopBarWithExpandedContentState {
-    val maxCollapsePxState = rememberSaveable { mutableStateOf(0f) }
-    val offsetPxState = rememberSaveable { mutableStateOf(0f) }
-
-    // NestedScrollConnection must read latest mutable state objects (we capture the MutableState instances,
-    // so reading .value is fresh inside callbacks).
-    val connection = remember {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                val dy = available.y
-                val maxCollapse = maxCollapsePxState.value
-                val currentOffset = offsetPxState.value
-
-                if (dy < 0f) {
-                    // collapse (scroll up) — increase offset
-                    val toConsume = min(-dy, max(0f, maxCollapse - currentOffset))
-                    if (toConsume > 0f) {
-                        offsetPxState.value = currentOffset + toConsume
-                        return Offset(0f, -toConsume)
-                    }
-                } else if (dy > 0f) {
-                    // expand (scroll down) — reduce offset
-                    val toConsume = min(dy, currentOffset)
-                    if (toConsume > 0f) {
-                        offsetPxState.value = currentOffset - toConsume
-                        return Offset(0f, toConsume)
-                    }
-                }
-                return Offset.Zero
-            }
-        }
-    }
-
-    return remember {
-        CollapsingTopBarWithExpandedContentState(
-            maxCollapsePxState = maxCollapsePxState,
-            offsetPxState = offsetPxState,
-            connection = connection
-        )
-    }
-}
-
-/**
- * CollapsingTopBar composable — measures expanded & collapsed slots and cross-fades them depending on state.
- *
- * - state: rememberCollapsingTopBarState()
- * - Pass Modifier.nestedScroll(state.nestedScrollConnection) to the parent that should intercept gestures.
- */
 @Composable
 fun CollapsingTopBarWithExpandedContent(
     state: CollapsingTopBarState,
     modifier: Modifier = Modifier,
-    backgroundColor: Color = Color.Transparent,
     collapsedContent: @Composable (progress: Float) -> Unit = {},
     expandedContent: @Composable (progress: Float) -> Unit
 ) {
@@ -133,7 +48,8 @@ fun CollapsingTopBarWithExpandedContent(
         }
 
         val frac = state.collapseFraction.coerceIn(0f, 1f)
-        val animatedHeightPx = lerpFloat(expandedHeightPx.toFloat(), collapsedHeightPx.toFloat(), frac).roundToInt()
+        val animatedHeightPx =
+            lerpFloat(expandedHeightPx.toFloat(), collapsedHeightPx.toFloat(), frac).roundToInt()
 
         // compute alpha for cross-fade
         val expandedAlpha = (1f - frac).coerceIn(0f, 1f)
@@ -175,6 +91,61 @@ fun CollapsingTopBarWithExpandedContent(
                 val y = layoutHeight - p.height
                 p.placeRelative(x, y)
             }
+        }
+    }
+}
+
+@Composable
+fun SlidingTopBar(
+    modifier: Modifier = Modifier,
+    state: CollapsingTopBarState = rememberCollapsingTopBarState(),
+    content: @Composable (progress: Float) -> Unit
+) {
+    SubcomposeLayout(modifier = modifier) { constraints ->
+        // измеряем тулбар в "expanded" состоянии, чтобы получить его высоту
+        val looseConstraints = constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity)
+
+        val expandedPlaceable = subcompose("expanded") {
+            // рендерим контент как "expanded" (progress=1f) — это только для измерения
+            content(1f)
+        }.map { it.measure(looseConstraints) }
+            .firstOrNull()
+
+        val topHeightPx = (expandedPlaceable?.height ?: 0)
+            .coerceIn(0, constraints.maxHeight)
+
+        // обновляем state.maxCollapsePx (px) — только при существенном изменении
+        val newMax = topHeightPx.toFloat()
+        if (kotlin.math.abs(state.maxCollapsePx - newMax) > 0.5f) {
+            state.maxCollapsePx = newMax
+        }
+
+        // капаем offset в корректный диапазон
+        state.offsetPx = state.offsetPx.coerceIn(0f, state.maxCollapsePx)
+
+        // progress 0..1: 1 = полностью виден, 0 = полностью спрятан
+        val progress = if (state.maxCollapsePx <= 0f) 1f
+        else ((state.maxCollapsePx - state.offsetPx) / state.maxCollapsePx).coerceIn(0f, 1f)
+
+        // теперь сабкомпонуем реальный контент тулбара, с модификатором, который задаёт translationY
+        val contentMeasurables = subcompose("content") {
+            // применяем graphicsLayer с translationY в пикселях (state.offsetPx хранится в px)
+            Box(modifier = Modifier.graphicsLayer {
+                translationY = -state.offsetPx
+            }) {
+                content(progress)
+            }
+        }
+
+        // измеряем под фиксированную высоту topHeightPx
+        val contentConstraints = constraints.copy(minHeight = topHeightPx, maxHeight = topHeightPx)
+        val contentPlaceable = contentMeasurables.map { it.measure(contentConstraints) }.firstOrNull()
+
+        // layout имеет ширину от родителей и высоту topHeightPx
+        val width = constraints.maxWidth
+        val height = topHeightPx
+        layout(width, height) {
+            contentPlaceable?.place(0, 0)
         }
     }
 }

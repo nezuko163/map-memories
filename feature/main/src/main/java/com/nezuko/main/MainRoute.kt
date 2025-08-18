@@ -23,7 +23,6 @@ import com.nezuko.ui.components.PagingList
 import com.nezuko.ui.components.SearchTextField
 import com.nezuko.ui.components.UnderlinedTextWithGap
 import com.nezuko.ui.components.rememberCollapsingTopBarState
-import com.nezuko.ui.components.rememberCollapsingTopBarWithExpandedContentState
 import com.nezuko.ui.theme.Spacing
 
 private const val TAG = "MainRoute"

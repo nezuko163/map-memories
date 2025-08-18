@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -40,6 +39,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,15 +54,11 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.nezuko.domain.model.Location
-import com.nezuko.domain.model.Memory
-import com.nezuko.domain.model.User
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.nezuko.ui.components.CollapsingTopBar
-import com.nezuko.ui.components.CollapsingTopBarWithExpandedContent
 import com.nezuko.ui.components.Image
 import com.nezuko.ui.components.ImageWithRatio
 import com.nezuko.ui.components.rememberCollapsingTopBarState
-import com.nezuko.ui.components.rememberCollapsingTopBarWithExpandedContentState
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -71,28 +68,21 @@ import java.time.format.DateTimeFormatter
 fun MemoryDetailsRoute(
     id: Int,
     navigateBack: () -> Unit,
+    vm: MemoryDetailsViewModel = hiltViewModel()
+) {
+    LaunchedEffect(Unit) {
+        vm.load(id)
+    }
 
-    ) {
-    val memory = Memory(
-        id = 1,
-        name = "Зимняя прогулка",
-        author = User(
-            1,
-            "Алексей Иванов",
-            "https://masterpiecer-images.s3.yandex.net/e6babcbf6ead11eeaab02aacdc0146ad:upscaled"
-        ),
-        photoUrl = "https://avatars.mds.yandex.net/i?id=6ddb0e238cb67cd072aab6de12476f66_l-7755611-images-thumbs&n=13",
-        photosUrls = List(6) { "https://cs8.livemaster.ru/storage/7a/79/57b03d6ebab5e881b452a9b6a54f.jpg" },
-        location = Location(55.75, 37.62),
-        description = "Длинное и содержательное описание воспоминания — где вы были, что чувствовали, с кем были, и почему это важно. Здесь можно показать несколько строк, а затем раскрыть полностью по нажатию.",
-        createdAt = System.currentTimeMillis() - 86_400_000L
-    )
+    val memoryState by vm.memory.collectAsState()
+    if (memoryState == null) return
+    val memory = memoryState!!
 
     val scrollBehavior = rememberCollapsingTopBarState()
 
     Scaffold(
         topBar = {
-            CollapsingTopBar(state = scrollBehavior, modifier = Modifier.background(Color.Black)) {
+            CollapsingTopBar(state = scrollBehavior) {
                 Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = navigateBack) {
                         Icon(
@@ -278,6 +268,6 @@ private fun formatDate(epochMillis: Long): String {
 @Composable
 private fun prev() {
     MaterialTheme {
-        MemoryDetailsRoute(1) { }
+        MemoryDetailsRoute(1, navigateBack = {})
     }
 }

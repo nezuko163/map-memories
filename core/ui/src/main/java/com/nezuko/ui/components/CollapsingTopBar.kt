@@ -4,6 +4,8 @@ import android.util.Log
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.Stable
@@ -12,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.layout.SubcomposeLayout
@@ -131,9 +134,10 @@ fun rememberCollapsingTopBarState(): CollapsingTopBarState {
 fun CollapsingTopBar(
     modifier: Modifier = Modifier,
     state: CollapsingTopBarState = rememberCollapsingTopBarState(),
+    background: Color = MaterialTheme.colorScheme.primaryContainer,
     content: @Composable () -> Unit
 ) {
-    SubcomposeLayout(modifier) { constraints ->
+    SubcomposeLayout(modifier.background(color = background)) { constraints ->
         val looseConstraints = constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity)
 
         val expandedMeasurables = subcompose("expanded") {
