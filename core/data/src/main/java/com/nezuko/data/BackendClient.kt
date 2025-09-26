@@ -32,9 +32,11 @@ class BackendClient @Inject constructor() {
             } else {
                 "https://i.pinimg.com/736x/ef/5e/0e/ef5e0e4d1a8ee76aeec555fa75cdd159.jpg"
             },
+            photosWithText = emptyList(),
             photosUrls = emptyList(),
+            tags = listOf("#футджоб", "#эщкере", "#люблю Юлечку"),
             location = Location(),
-            "asd"
+            description = "asd"
         )
     }
 

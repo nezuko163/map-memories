@@ -57,6 +57,8 @@ fun Image(
     )
 }
 
+
+
 @Composable
 fun ImageWithRatio(
     modifier: Modifier = Modifier,
@@ -88,6 +90,16 @@ fun ImageWithRatio(
             SubcomposeAsyncImageContent()
         }
     }
+}
+
+@Composable
+fun BoxWithImageRatio(
+    modifier: Modifier = Modifier,
+    url: String,
+    contentDescription: String? = null,
+    contentScale: ContentScale = ContentScale.Crop,
+    content: @Composable () -> Unit
+    ) {
 }
 
 object ImageRatioCache {

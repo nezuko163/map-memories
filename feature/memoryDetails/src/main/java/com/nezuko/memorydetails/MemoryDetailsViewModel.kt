@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nezuko.domain.model.Location
 import com.nezuko.domain.model.Memory
+import com.nezuko.domain.model.PhotoWithText
 import com.nezuko.domain.model.User
 import com.nezuko.domain.repository.MemoriesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -34,6 +35,8 @@ class MemoryDetailsViewModel @Inject constructor(
                 photosUrls = List(6) { "https://cs8.livemaster.ru/storage/7a/79/57b03d6ebab5e881b452a9b6a54f.jpg" },
                 location = Location(55.75, 37.62),
                 description = "Длинное и содержательное описание воспоминания — где вы были, что чувствовали, с кем были, и почему это важно. Здесь можно показать несколько строк, а затем раскрыть полностью по нажатию.",
+                photosWithText = List(4) { PhotoWithText(name = "Шаг $it","Очень крутая подпись $it ".repeat(7), "https://cs8.livemaster.ru/storage/7a/79/57b03d6ebab5e881b452a9b6a54f.jpg") },
+                tags = listOf("#футджоб", "#эщкере", "#люблю Юлечку"),
                 createdAt = System.currentTimeMillis() - 86_400_000L
             )
             _memory.value = memory

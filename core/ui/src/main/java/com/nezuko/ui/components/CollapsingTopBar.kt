@@ -55,7 +55,6 @@ class CollapsingTopBarState internal constructor(
 fun rememberCollapsingTopBarState(): CollapsingTopBarState {
     val maxCollapsePxState = rememberSaveable { mutableFloatStateOf(0f) }
     val offsetPxState = rememberSaveable { mutableFloatStateOf(0f) }
-    var offsetAnim = remember { Animatable(offsetPxState.floatValue) }
 
     val connection = remember {
         object : NestedScrollConnection {
@@ -150,15 +149,12 @@ fun CollapsingTopBar(
         val collapsedH = 0
         val expandedH = (expandedPlaceable?.height ?: collapsedH)
             .coerceIn(collapsedH, constraints.maxHeight)
-        Log.i(TAG, "CollapsingTopBar: expH - $expandedH")
 
         val newMaxCollapse = (expandedH - collapsedH).toFloat().coerceAtLeast(0f)
         if (abs(state.maxCollapsePx - newMaxCollapse) > 0.5f) {
             // internal поле maxCollapsePxState есть в твоём state — обновляем
             state.maxCollapsePx = newMaxCollapse
         }
-
-        Log.i(TAG, "CollapsingTopBar: newMaxColl - $newMaxCollapse")
 
         state.offsetPx = state.offsetPx.coerceIn(0f, state.maxCollapsePx)
 
@@ -178,8 +174,6 @@ fun CollapsingTopBar(
         val contentPlaceable = contentMeasurables
             .map { it.measure(contentConstraints) }
             .firstOrNull()
-
-        Log.i(TAG, "CollapsingTopBar: height - $height")
 
         layout(contentConstraints.maxWidth, height) {
             contentPlaceable?.place(0, 0)
